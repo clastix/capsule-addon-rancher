@@ -1,0 +1,121 @@
+# Default values for capsule-rancher-addon.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+certManager:
+
+  # -- Specifies whether webhook certificates should be generated using cert-manager
+  generateCertificates: true
+
+image:
+
+  # -- Set the image repository of the capsule.
+  repository: clastix/capsule-rancher-addon
+
+  # -- Set the image pull policy.
+  pullPolicy: IfNotPresent
+
+  # -- Overrides the image tag whose default is the chart appVersion.
+  tag: ''
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+manager:
+  serviceAccount:
+
+    # Specifies whether a service account should be created
+    create: true
+
+    # Annotations to add to the service account
+    annotations: {}
+
+    # The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name: ""
+
+  # -- The number of replicas of the manager.
+  replicaCount: 1
+
+  # -- The annotations to be applied to the manager pod.
+  podAnnotations: {}
+
+  # -- The security context to be applied to the manager pod.
+  podSecurityContext: {}
+  # fsGroup: 2000
+
+  # -- The nodeSelector to be applied to the manager pod.
+  nodeSelector: {}
+
+  # -- The tolerations to be applied to the manager pod.
+  tolerations: []
+
+  # -- The affinity to be applied to the manager pod.
+  affinity: {}
+
+  webhook:
+    securityContext: {}
+      # capabilities:
+      #   drop:
+      #   - ALL
+      # readOnlyRootFilesystem: true
+      # runAsNonRoot: true
+      # runAsUser: 1000
+    service:
+
+      # -- The webhook service type
+      type: ClusterIP
+
+      # -- The webhook service port
+      port: 443
+
+    # -- The mutating webhook failurePolicy
+    failurePolicy: Fail #Ignore
+
+    # -- Timeout in seconds for the mutating webhook
+    timeoutSeconds: 30
+
+    # -- SideEffects of the mutating webhook
+    sideEffects: None
+
+    # -- ReinvocationPolicy of the mutating webhook
+    reinvocationPolicy: Never
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+proxy:
+
+  # -- The name prefix of the ConfigMap that contains the kubeconfig for the proxy.
+  configMapPrefix: impersonation-shell-admin-kubeconfig-
+
+  # -- The key in the ConfigMap that contains the kubeconfig for the proxy.
+  configMapKey: config
+
+  # -- The path in the webhook container to the certificate file of the Certificate Authority that signed the proxy certificate.
+  caMountPath: /tmp/proxy
+
+  # -- The name of the secret that contains the certificate file of the Certificate Authority that signed the proxy certificate.
+  caSecretName: capsule-proxy
+
+  # -- The key in the secret that contains the certificate file of the Certificate Authority that signed the proxy certificate.
+  caSecretKey: ca
+
+  # -- The port of the proxy Service.
+  servicePort: 9001
+
+  # -- The scheme of the proxy Service.
+  serviceScheme: https
+
+  # -- The URL of the proxy Service.
+  serviceURL: capsule-proxy.capsule-system.svc

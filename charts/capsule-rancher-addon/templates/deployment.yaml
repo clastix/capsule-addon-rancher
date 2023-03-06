@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "capsule-rancher-addon.fullname" . }}
+  labels:
+    {{- include "capsule-rancher-addon.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.manager.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "capsule-rancher-addon.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "capsule-rancher-addon.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "capsule-rancher-addon.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: webhook
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - webhook
+            - --config-map-key={{ .Values.proxy.configMapKey }}
+            - --config-map-prefix={{ .Values.proxy.configMapPrefix }}
+            - --proxy-ca-path={{ .Values.proxy.caMountPath }}/{{ .Values.proxy.caSecretKey }}
+            - --proxy-service-port={{ .Values.proxy.servicePort }}
+            - --proxy-service-scheme={{ .Values.proxy.serviceScheme }}
+            - --proxy-service-url={{ .Values.proxy.serviceURL }}
+          ports:
+            - name: webhook
+              containerPort: 9443
+              protocol: TCP
+            - name: metrics
+              containerPort: 8081
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.manager.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+            - mountPath: {{ .Values.proxy.caMountPath }}
+              name: proxy-ca
+              readOnly: true
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: {{ include "capsule-rancher-addon.secretTlsName" . }}
+        - name: proxy-ca
+          secret:
+            defaultMode: 420
+            secretName: {{ .Values.proxy.caSecretName }}
