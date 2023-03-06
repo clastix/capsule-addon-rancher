@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "capsule-rancher-addon.fullname" . }}-webhook
+  labels:
+    {{- include "capsule-rancher-addon.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.manager.webhook.service.type }}
+  ports:
+    - port: {{ .Values.manager.webhook.service.port }}
+      targetPort: webhook
+      protocol: TCP
+      name: https
+  selector:
+    {{- include "capsule-rancher-addon.selectorLabels" . | nindent 4 }}

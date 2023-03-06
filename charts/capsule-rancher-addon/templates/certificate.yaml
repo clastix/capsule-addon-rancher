@@ -1,0 +1,37 @@
+{{- if .Values.certManager.generateCertificates }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "capsule-rancher-addon.fullname" . }}-webhook-selfsigned
+  labels:
+    {{- include "capsule-rancher-addon.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "capsule-rancher-addon.fullname" . }}-webhook-cert
+  labels:
+    {{- include "capsule-rancher-addon.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  dnsNames:
+    - {{ include "capsule-rancher-addon.fullname" . }}-webhook.{{ .Release.Namespace }}.svc
+    - {{ include "capsule-rancher-addon.fullname" . }}-webhook.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: {{ include "capsule-rancher-addon.fullname" . }}-webhook-selfsigned
+  secretName: {{ include "capsule-rancher-addon.secretTlsName" . }}
+  subject:
+    organizations:
+      - clastix.io
+{{- end }}
+
