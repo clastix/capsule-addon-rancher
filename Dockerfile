@@ -36,3 +36,11 @@ COPY --from=builder /workspace/manager .
 USER nonroot:nonroot
 
 ENTRYPOINT ["/manager"]
+
+FROM golang:1.19-alpine as dlv
+RUN CGO_ENABLED=0 go install github.com/go-delve/delve/cmd/dlv@latest
+WORKDIR /
+COPY --from=builder /workspace/manager .
+
+ENTRYPOINT ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "--", "/manager"
+

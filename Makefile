@@ -22,8 +22,16 @@ image:
 		--build-arg GIT_LAST_TAG=$(VERSION) \
 		--build-arg BUILD_DATE=$(BUILD_DATE)
 
+image/dlv: VERSION := dlv
+image/dlv:
+	docker build . --build-arg "GCFLAGS=all=-N -l" --tag $(IMG) --target dlv
+
 # Push the container image
 image/push: image
+	docker push $(IMG)
+
+image/dlv/push: VERSION := dlv
+image/dlv/push: image/dlv
 	docker push $(IMG)
 
 # Generate manifests e.g. CRD, RBAC etc.
