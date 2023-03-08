@@ -1,0 +1,88 @@
+name: Helm Chart
+
+on:
+  push:
+    tags: [ "helm-v*" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: azure/setup-helm@v1
+        with:
+          version: 3.3.4
+      - name: Add dependency repositories
+        run: |
+          for dir in $(ls -d charts/*/); do
+            helm dependency list $dir 2> /dev/null | tail +2 | head -n -1 | awk '{ print "helm repo add " $1 " " $3 }' | while read cmd; do $cmd; done
+          done
+      - name: Linting Chart
+        run: helm lint ./charts/capsule-rancher-addon
+      - name: Setup Chart Linting
+        id: lint
+        uses: helm/chart-testing-action@v2.3.0
+      - name: Run chart-testing (list-changed)
+        id: list-changed
+        run: |
+          changed=$(ct list-changed --config ./.github/configs/ct.yaml)
+          if [[ -n "$changed" ]]; then
+            echo "::set-output name=changed::true"
+          fi
+      - name: Run chart-testing (lint)
+        run: ct lint --debug --config ./.github/configs/ct.yaml --lint-conf ./.github/configs/lintconf.yaml
+      - name: Run docs-testing (helm-docs)
+        id: helm-docs
+        run: |
+          make helm-docs
+          if [[ $(git diff --stat) != '' ]]; then
+            echo -e '\033[0;31mDocumentation outdated! (Run make helm-docs locally and commit)\033[0m ❌'
+            git diff --color
+            exit 1
+          else
+            echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
+          fi
+      # Create KIND Cluster
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.2.0
+        if: steps.list-changed.outputs.changed == 'true'
+      # Install Required Operators/CRDs
+      - name: Prepare Cluster Operators/CRDs
+        run: |
+          kubectl create -f https://github.com/cert-manager/cert-manager/releases/download/v1.11.0/cert-manager.crds.yaml
+        if: steps.list-changed.outputs.changed == 'true'
+      # Install Charts
+      - name: Generate Capsule Proxy fake CA
+        run: |
+          openssl genrsa 2048 > ca.key
+          openssl req -new -key ca.key -out ca.csr -subj "/C=IT/O=clastix/OU=clastix/CN=capsule-proxy.capsule-system.svc"
+          openssl x509 -req -days 3650 -in ca.csr -signkey ca.key -out ca.crt
+          kubectl create namespace capsule-system
+          kubectl create secret tls -n capsule-system capsule-proxy --cert=ca.crt --key=ca.key
+        if: steps.list-changed.outputs.changed == 'true'
+      - name: Run chart-testing (install)
+        run: ct install --namespace capsule-system --debug --config ./.github/configs/ct.yaml
+        if: steps.list-changed.outputs.changed == 'true'
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/helm-v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Publish Helm chart
+        uses: stefanprodan/helm-gh-pages@master
+        with:
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          charts_dir: charts
+          charts_url: https://clastix.github.io/charts
+          owner: clastix
+          repository: charts
+          branch: gh-pages
+          target_dir: .
+          commit_username: prometherion
+          commit_email: dario@tranchitella.eu
