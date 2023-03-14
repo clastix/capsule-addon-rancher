@@ -71,7 +71,7 @@ manager:
       port: 443
 
     # -- The mutating webhook failurePolicy
-    failurePolicy: Fail #Ignore
+    failurePolicy: Ignore
 
     # -- Timeout in seconds for the mutating webhook
     timeoutSeconds: 30
