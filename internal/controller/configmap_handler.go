@@ -52,13 +52,13 @@ func (c *ConfigMapHandler) InjectDecoder(d *admission.Decoder) error {
 }
 
 func (c *ConfigMapHandler) Handle(ctx context.Context, request admission.Request) admission.Response {
-	if !strings.HasPrefix(request.Name, c.ConfigMapPrefix) {
-		return admission.Allowed("")
-	}
-
 	cm := &corev1.ConfigMap{}
 	if err := c.decoder.Decode(request, cm); err != nil {
 		return admission.Errored(http.StatusInternalServerError, errors.Wrap(err, "unable to decode to *corev1.ConfigMap"))
+	}
+
+	if !strings.HasPrefix(cm.GetGenerateName(), c.ConfigMapPrefix) {
+		return admission.Allowed("")
 	}
 
 	if len(cm.Data) == 0 {
