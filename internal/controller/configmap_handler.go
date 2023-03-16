@@ -10,10 +10,14 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/tools/clientcmd"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -30,8 +34,61 @@ type ConfigMapHandler struct {
 	ProxyPort   int
 	ProxyCA     []byte
 
+	log logr.Logger
+
 	decoder *admission.Decoder
 	encoder *json.Serializer
+}
+
+type Option func(options *ConfigMapHandler)
+
+// NewConfigMapHandler returns a pointer to a new ConfigMapHandler options structure.
+func NewConfigMapHandler(options ...Option) *ConfigMapHandler {
+	o := &ConfigMapHandler{}
+
+	for _, opt := range options {
+		opt(o)
+	}
+
+	o.addLogger()
+
+	return o
+}
+
+func WithConfigMapPrefix(prefix string) Option {
+	return func(o *ConfigMapHandler) {
+		o.ConfigMapPrefix = prefix
+	}
+}
+
+func WithConfigMapKey(key string) Option {
+	return func(o *ConfigMapHandler) {
+		o.ConfigMapKey = key
+	}
+}
+
+func WithProxyScheme(scheme string) Option {
+	return func(o *ConfigMapHandler) {
+		o.ProxyScheme = scheme
+	}
+}
+
+func WithProxyURL(url string) Option {
+	return func(o *ConfigMapHandler) {
+		o.ProxyURL = url
+	}
+}
+
+func WithProxyPort(port int) Option {
+	return func(o *ConfigMapHandler) {
+		o.ProxyPort = port
+	}
+}
+
+func WithProxyCA(ca []byte) Option {
+	return func(o *ConfigMapHandler) {
+		o.ProxyCA = ca
+	}
 }
 
 func (c *ConfigMapHandler) SetupWithManager(mgr manager.Manager) error {
@@ -93,5 +150,18 @@ func (c *ConfigMapHandler) Handle(ctx context.Context, request admission.Request
 		return admission.Errored(http.StatusInternalServerError, errors.Wrap(err, "unable to encode mangled *corev1.ConfigMap"))
 	}
 
+	fmt.Println(c.log.Enabled())
+	c.log.Info(fmt.Sprintf("updated ConfigMap %s/%s"), cm.Namespace, cm.Name)
+
 	return admission.PatchResponseFromRaw(request.Object.Raw, buf.Bytes())
+}
+
+func (o *ConfigMapHandler) addLogger() {
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zap.Options{
+		EncoderConfigOptions: append([]zap.EncoderConfigOption{}, func(config *zapcore.EncoderConfig) {
+			config.EncodeTime = zapcore.ISO8601TimeEncoder
+		}),
+	})))
+
+	o.log = ctrl.Log.WithName("configmap-handler")
 }

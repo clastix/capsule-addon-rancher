@@ -39,14 +39,14 @@ func New() *cobra.Command {
 				return errors.Wrap(err, "unable to read the CA file required by ConfigMapHandler")
 			}
 
-			if err = (&controller.ConfigMapHandler{
-				ConfigMapPrefix: viper.GetString(constants.WebhookConfigMapPrefix),
-				ConfigMapKey:    viper.GetString(constants.WebhookConfigMapKey),
-				ProxyScheme:     viper.GetString(constants.WebhookProxyServiceScheme),
-				ProxyURL:        viper.GetString(constants.WebhookProxyServiceURL),
-				ProxyPort:       viper.GetInt(constants.WebhookProxyServicePort),
-				ProxyCA:         ca,
-			}).SetupWithManager(mgr); err != nil {
+			if err = controller.NewConfigMapHandler(
+				controller.WithConfigMapPrefix(viper.GetString(constants.WebhookConfigMapPrefix)),
+				controller.WithConfigMapKey(viper.GetString(constants.WebhookConfigMapKey)),
+				controller.WithProxyScheme(viper.GetString(constants.WebhookProxyServiceScheme)),
+				controller.WithProxyURL(viper.GetString(constants.WebhookProxyServiceURL)),
+				controller.WithProxyPort(viper.GetInt(constants.WebhookProxyServicePort)),
+				controller.WithProxyCA(ca),
+			).SetupWithManager(mgr); err != nil {
 				return errors.Wrap(err, "unable to setup ConfigMapHandler")
 			}
 
