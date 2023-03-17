@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/tools/clientcmd"
@@ -35,6 +34,7 @@ type ConfigMapHandler struct {
 	ProxyCA     []byte
 
 	log logr.Logger
+	zap *zap.Options
 
 	decoder *admission.Decoder
 	encoder *json.Serializer
@@ -49,8 +49,7 @@ func NewConfigMapHandler(options ...Option) *ConfigMapHandler {
 	for _, opt := range options {
 		opt(o)
 	}
-
-	o.addLogger()
+	o.setLogger()
 
 	return o
 }
@@ -88,6 +87,12 @@ func WithProxyPort(port int) Option {
 func WithProxyCA(ca []byte) Option {
 	return func(o *ConfigMapHandler) {
 		o.ProxyCA = ca
+	}
+}
+
+func WithZap(zap *zap.Options) Option {
+	return func(o *ConfigMapHandler) {
+		o.zap = zap
 	}
 }
 
@@ -150,18 +155,13 @@ func (c *ConfigMapHandler) Handle(ctx context.Context, request admission.Request
 		return admission.Errored(http.StatusInternalServerError, errors.Wrap(err, "unable to encode mangled *corev1.ConfigMap"))
 	}
 
-	fmt.Println(c.log.Enabled())
-	c.log.Info(fmt.Sprintf("updated ConfigMap %s/%s"), cm.Namespace, cm.Name)
+	c.log.WithValues("Namespace", cm.Namespace).WithValues("Name", cm.GetName()).WithValues("GenerateName", cm.GetGenerateName()).Info("updated ConfigMap")
 
 	return admission.PatchResponseFromRaw(request.Object.Raw, buf.Bytes())
 }
 
-func (o *ConfigMapHandler) addLogger() {
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zap.Options{
-		EncoderConfigOptions: append([]zap.EncoderConfigOption{}, func(config *zapcore.EncoderConfig) {
-			config.EncodeTime = zapcore.ISO8601TimeEncoder
-		}),
-	})))
+func (o *ConfigMapHandler) setLogger() {
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(o.zap)))
 
 	o.log = ctrl.Log.WithName("configmap-handler")
 }
